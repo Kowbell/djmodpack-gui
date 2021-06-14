@@ -1,0 +1,9 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="djmodpack-gui:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/djmodpack_gui_jar</output-path>
+    <root id="archive" name="djmodpack-gui.jar">
+      <element id="module-output" name="djmodpack-gui" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/lib/json-20210307.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>
