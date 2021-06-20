@@ -1,17 +1,20 @@
 package dev.kowbell.djmodpack;
 
 import dev.kowbell.utils.Swatch;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.function.DoubleConsumer;
 import java.util.function.Function;
@@ -46,7 +49,7 @@ public class UpdateUtils {
         }
     }
 
-    public static String APIEndpoint = "https://api.github.com/repos/Kowbell/djmodpack/releases";
+    public static String APIEndpoint = "https://api.github.com/repos/Kowbell/djmodpack2/releases";
 
     public static ReleaseInfo CheckForUpdate() {
 
@@ -56,7 +59,7 @@ public class UpdateUtils {
         ReleaseInfo mostRecentRelease = GetMostRecentReleaseInfo();
 
         if (mostRecentRelease.version.compareTo(minecraftInstall.installedVersion) > 0) {
-            System.out.println("Update available!");
+            System.out.printf("Update available: %s -> %s\n", minecraftInstall.installedVersion, mostRecentRelease.version);
 
 //            App.getInstance().PresentText(GetUpdatePresentationText(minecraftInstall, mostRecentRelease));
 //
@@ -68,20 +71,13 @@ public class UpdateUtils {
 
             return mostRecentRelease;
         } else {
+            System.out.printf("No updated available: local %s == most recent %s\n", minecraftInstall.installedVersion, mostRecentRelease.version);
             return null;
         }
     }
 
 
-    public static String GetUpdatePresentationText(LocalMinecraftInstall localMinecraftInstall, ReleaseInfo releaseInfo) {
-        StringBuilder sb = new StringBuilder();
 
-        sb.append("New update available (").append(localMinecraftInstall.installedVersion).append(" -> ").append(releaseInfo.version).append(")");
-        sb.append("\n\n\n");
-        sb.append(releaseInfo.json.getString("body"));
-
-        return sb.toString();
-    }
 
     /**
      * see https://docs.github.com/en/rest/reference/repos#releases
@@ -112,9 +108,8 @@ public class UpdateUtils {
                 if (mostRecentRelease == null || release.compareTo(mostRecentRelease) > 0) {
                     mostRecentRelease = release;
                 }
-            } catch (JSONException e) {
-                System.out.printf("Caught JSON exception '%s' parsing JSON '%s'\n",
-                        e.getMessage(), jsonObj.toString(1));
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
 
@@ -124,7 +119,7 @@ public class UpdateUtils {
 
 
 
-    public static void DownloadRelease(ReleaseInfo releaseInfo, DoubleConsumer updateProgress) {
+    public static ZipInputStream DownloadRelease(ReleaseInfo releaseInfo, DoubleConsumer updateProgress) {
         // download
         updateProgress.accept(0);
         ZipInputStream zipIn = null;
@@ -158,25 +153,149 @@ public class UpdateUtils {
 
         System.out.println("Downloaded Release Zip:");
 
-//        try {
-//            ZipEntry entry = zipIn.getNextEntry();
-//            while(entry != null) {
-//                // https://stackoverflow.com/questions/51285325/copying-entries-from-zipinputstream
-//                System.out.println(entry.getName());
-////                if (!entry.isDirectory()) {
-////                    // if the entry is a file, extracts it
-////                    System.out.println("===File===");
-////
-////                } else {
-////                    System.out.println("===Directory===");
-////                }
-//                zipIn.closeEntry();
-//                entry = zipIn.getNextEntry();
-//
-//            }
-//        } catch (Exception e) {
-//            System.out.printf("Fuck! Exception while parsing .zip: '%s'", e.getMessage());
-//        }
+
+
+        return zipIn;
+    }
+
+    public static File UnpackUpdate(ZipInputStream inUpdateZip) {
+        LocalMinecraftInstall localMinecraftInstall = LocalMinecraftInstall.GetLocalMinecraftInstall();
+        File dotMinecraft = LocalMinecraftInstall.GetDotMinecraftFolder();
+        File extractionDir = new File(new File(dotMinecraft, "versions"), "djmodpack2-TMP");
+
+        try {
+            if (extractionDir.exists()) {
+                System.out.printf("Removing old tmp folder '%s'...\n", extractionDir.toString());
+
+                FileUtils.deleteDirectory(extractionDir);
+            }
+
+            if (extractionDir.mkdirs() == false)
+                throw new IOException("Failed to make extraction directory '" + extractionDir.toString() + "'");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        System.out.printf("Extracting downloaded zip to '%s'...\n", extractionDir.toString());
+
+
+        // https://stackoverflow.com/a/10851168
+        try {
+
+            ZipEntry entry;
+
+            while ((entry = inUpdateZip.getNextEntry()) != null) {
+
+
+                // Create a file on HDD in the destinationPath directory
+                // destinationPath is a "root" folder, where you want to extract your ZIP file
+                File entryFile = new File(extractionDir, entry.getName());
+                if (entry.isDirectory()) {
+
+                    if (entryFile.exists()) {
+                        throw new IOException("Directory " + entryFile.toString());
+                    } else {
+                        entryFile.mkdirs();
+                        System.out.printf("Extraction: Make directory '%s'...\n", entryFile.toString());
+                    }
+
+                } else {
+
+                    // Make sure all folders exists (they should, but the safer, the better ;-))
+                    if (entryFile.getParentFile() != null && !entryFile.getParentFile().exists()) {
+                        entryFile.getParentFile().mkdirs();
+                    }
+
+                    // Create file on disk...
+                    if (!entryFile.exists()) {
+                        entryFile.createNewFile();
+                        System.out.printf("Extraction: Copy file '%s'...\n", entryFile);
+                    }
+
+                    // and rewrite data from stream
+                    OutputStream os = null;
+                    try {
+                        os = new FileOutputStream(entryFile);
+                        IOUtils.copy(inUpdateZip, os);
+                    } finally {
+                        IOUtils.closeQuietly(os);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            IOUtils.closeQuietly(inUpdateZip);
+        }
+
+        return extractionDir;
+    }
+
+    public static void InstallUpdate(ZipInputStream inUpdateZip) {
+        // ...
+
+
+        ArrayList<String> updatesToInstall = new ArrayList<String>();
+
+        LocalMinecraftInstall localMinecraftInstall = LocalMinecraftInstall.GetLocalMinecraftInstall();
+
+
+
+        // Enumerate Zip:
+        try {
+            ZipEntry entry = inUpdateZip.getNextEntry();
+            while(entry != null) {
+                // https://stackoverflow.com/questions/51285325/copying-entries-from-zipinputstream
+
+                String entryName = entry.getName();
+                if (entry.isDirectory() && entryName.startsWith("update")) {
+                    String entryVersionStr = entryName.replace("update-v", "");
+                    VersionInfo entryVersion = new VersionInfo(entryVersionStr);
+
+                    if (entryVersion.compareTo(localMinecraftInstall.installedVersion) > 0) {
+                        System.out.printf("Queuing update %s (from dir name '%s')", entryVersion.toString(), entryName);
+
+                    } else {
+                        System.out.printf("Skipping update %s (from dir name '%s') (game is already %s)",
+                                entryVersion.toString(), entryName, localMinecraftInstall.installedVersion);
+                    }
+                }
+                inUpdateZip.closeEntry();
+                entry = inUpdateZip.getNextEntry();
+            }
+        } catch (Exception e) {
+            System.out.printf("Fuck! Exception while parsing .zip: '%s'", e.getMessage());
+        }
+        // ...done enumerating zip.
+
+
+        // Apply updates...
+        try {
+            inUpdateZip.reset();
+            ZipEntry entry = inUpdateZip.getNextEntry();
+            while(entry != null) {
+                // https://stackoverflow.com/questions/51285325/copying-entries-from-zipinputstream
+
+                String entryName = entry.getName();
+                if (entry.isDirectory() && entryName.startsWith("update")) {
+                    String entryVersionStr = entryName.replace("update-v", "");
+                    VersionInfo entryVersion = new VersionInfo(entryVersionStr);
+
+                    if (entryVersion.compareTo(localMinecraftInstall.installedVersion) > 0) {
+                        System.out.printf("Queuing update %s (from dir name '%s')", entryVersion.toString(), entryName);
+                        updatesToInstall.add(entryName);
+                    } else {
+                        System.out.printf("Skipping update %s (from dir name '%s') (game is already %s)",
+                                entryVersion.toString(), entryName, localMinecraftInstall.installedVersion);
+                    }
+                }
+                inUpdateZip.closeEntry();
+                entry = inUpdateZip.getNextEntry();
+            }
+        } catch (Exception e) {
+            System.out.printf("Fuck! Exception while parsing .zip: '%s'", e.getMessage());
+        }
+        // ...done applying updates!
 
     }
 

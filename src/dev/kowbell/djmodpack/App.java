@@ -5,6 +5,7 @@ import com.formdev.flatlaf.*;
 import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.lang.management.ManagementFactory;
 
 public class App {
     private boolean ready = false;
@@ -12,24 +13,16 @@ public class App {
     private String buttonLaunchDefaultText = "Launch!";
     private String buttonLaunchDefaultUnreadyText = "Uhh, wait one sec...";
     private JPanel panelMain;
-    private JTextPane statusText;
+    private JTextArea statusText;
     private JProgressBar progressBar;
 
     public App() {
         buttonLaunch.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                JOptionPane.showMessageDialog(null, "Good job, DJ!");
+                JOptionPane.showMessageDialog(null, "jk lol, i cant launch minecraft for you. you need to open the launcher.");
             }
         });
-
-//        btnCheckUpdate.addActionListener(new ActionListener() {
-//            @Override
-//            public void actionPerformed(ActionEvent e) {
-//                LocalMinecraftInstall.GetModpackProfile();
-//
-//            }
-//        });
 
     }
 
@@ -74,31 +67,34 @@ public class App {
         }
 
 
-//        try {
-//            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-//        } catch (Exception e) {
-//            System.out.println("Couldn't set look and feel to system default!");
-//        }
-
-
-        JFrame frameMain = new JFrame("DJ's App");
+        JFrame frameMain = new JFrame("DJModpack2 Auto-Updater!");
         instance = new App();
 
         frameMain.setContentPane(instance.panelMain);
         frameMain.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 //        frameMain.pack();
-        frameMain.setSize(640, 480);
+        frameMain.setSize(1280, 720);
         frameMain.setLocationRelativeTo(null);
         frameMain.setVisible(true);
-
-
 
 
         new UpdateWorker().execute();
 
     }
 
-    private void createUIComponents() {
-        // TODO: place custom component creation code here
+    public static int GetRamGb() {
+        try {
+            long memorySize = ((com.sun.management.OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean()).getTotalPhysicalMemorySize();
+            float memoryGb = memorySize / 1024f / 1024f / 1024f;
+
+            System.out.printf("DETECTED RAM: %.2f GB\n", memoryGb);
+            if (memoryGb > 7.5f)
+                return 8;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return 6;
     }
+
 }

@@ -4,6 +4,10 @@
     <root id="archive" name="djmodpack-gui.jar">
       <element id="module-output" name="djmodpack-gui" />
       <element id="extracted-dir" path="$PROJECT_DIR$/lib/json-20210307.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/lib/javatuples-1.2.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/lib/commons-lang3-3.3.2.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/lib/commons-io-2.10.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/lib/flatlaf-1.2.jar" path-in-jar="/" />
     </root>
   </artifact>
 </component>
